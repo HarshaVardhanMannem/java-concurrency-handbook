@@ -1,7 +1,7 @@
 package com.newsradar.pipeline;
 
 import com.newsradar.config.FeedConfig;
-import com.newsradar.fetch.HttpFeedFetcher;
+import com.newsradar.fetch.FeedFetcher;
 import com.newsradar.model.Article;
 import com.newsradar.model.RawFeed;
 import com.newsradar.parse.RssParser;
@@ -17,10 +17,10 @@ public final class SequentialAggregator {
 
     private static final Logger log = LoggerFactory.getLogger(SequentialAggregator.class);
 
-    private final HttpFeedFetcher fetcher;
+    private final FeedFetcher fetcher;
     private final RssParser parser;
 
-    public SequentialAggregator(HttpFeedFetcher fetcher, RssParser parser) {
+    public SequentialAggregator(FeedFetcher fetcher, RssParser parser) {
         this.fetcher = fetcher;
         this.parser = parser;
     }
