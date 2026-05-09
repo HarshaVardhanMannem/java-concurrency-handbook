@@ -9,7 +9,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 
-public final class HttpFeedFetcher {
+public final class HttpFeedFetcher implements FeedFetcher {
 
     private final HttpClient client;
     private final Duration requestTimeout;
@@ -26,6 +26,7 @@ public final class HttpFeedFetcher {
                 .build();
     }
 
+    @Override
     public RawFeed fetch(FeedConfig feed) throws IOException, InterruptedException {
         HttpRequest req = HttpRequest.newBuilder(feed.url())
                 .timeout(requestTimeout)
