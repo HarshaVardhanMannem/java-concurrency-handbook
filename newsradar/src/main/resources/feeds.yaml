@@ -1,0 +1,18 @@
+# Real public RSS feeds — used by NewsRadar to demonstrate concurrent fetching.
+# We start with a handful; later phases will scale this list to feel concurrency wins.
+feeds:
+  - id: hn-frontpage
+    name: "Hacker News — Front Page"
+    url: "https://news.ycombinator.com/rss"
+  - id: bbc-world
+    name: "BBC News — World"
+    url: "http://feeds.bbci.co.uk/news/world/rss.xml"
+  - id: nyt-home
+    name: "NYT — Home Page"
+    url: "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml"
+  - id: theverge
+    name: "The Verge"
+    url: "https://www.theverge.com/rss/index.xml"
+  - id: arstechnica
+    name: "Ars Technica"
+    url: "https://feeds.arstechnica.com/arstechnica/index"
