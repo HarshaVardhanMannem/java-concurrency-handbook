@@ -76,7 +76,7 @@ mvn exec:java -Dexec.args="--mode=sequential"
 
 ---
 
-## Phase 2 — Thread pool fetcher (the classic win)
+## Phase 2 — Thread pool fetcher (the classic win) (✅ done)
 
 **Goal:** the standard `ExecutorService` pattern.
 
