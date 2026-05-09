@@ -2,7 +2,8 @@
 <configuration>
     <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
-            <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{24} - %msg%n</pattern>
+            <!-- Phase 1 is single-threaded; thread column hidden until Phase 2. -->
+            <pattern>%d{HH:mm:ss.SSS} %-5level %logger{0} | %msg%n</pattern>
         </encoder>
     </appender>
 
