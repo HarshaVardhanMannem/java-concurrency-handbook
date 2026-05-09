@@ -54,7 +54,7 @@ mvn test
 
 ---
 
-## Phase 1 — Sequential baseline (the slow version, on purpose)
+## Phase 1 — Sequential baseline (the slow version, on purpose) (✅ done)
 
 **Goal:** feel why blocking I/O wastes CPU.
 
