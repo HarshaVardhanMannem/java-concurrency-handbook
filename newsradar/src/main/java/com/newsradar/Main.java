@@ -3,10 +3,13 @@ package com.newsradar;
 import com.newsradar.config.FeedConfig;
 import com.newsradar.config.FeedConfigLoader;
 import com.newsradar.fetch.HttpFeedFetcher;
+import com.newsradar.http.LoadTest;
+import com.newsradar.http.SearchServer;
 import com.newsradar.index.ConcurrentIndex;
 import com.newsradar.index.IndexFixture;
 import com.newsradar.index.IndexFixture.StressResult;
 import com.newsradar.index.InvertedIndex;
+import com.newsradar.index.SearchableIndex;
 import com.newsradar.index.SynchronizedIndex;
 import com.newsradar.index.UnsafeHashMapIndex;
 import com.newsradar.model.Article;
@@ -14,6 +17,9 @@ import com.newsradar.parse.RssParser;
 import com.newsradar.pipeline.PipelineAggregator;
 import com.newsradar.pipeline.PooledAggregator;
 import com.newsradar.pipeline.SequentialAggregator;
+
+import java.time.Duration;
+import java.util.concurrent.CountDownLatch;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -37,6 +43,7 @@ public final class Main {
             case "info" -> log.info("Modes: --mode=sequential | --mode=pooled --pool=N | "
                     + "--mode=pipeline --fetchers=N --parsers=M --queue=K | "
                     + "--mode=index-stress --threads=N --articles=M --vocab=K --tokens=T | "
+                    + "--mode=serve --port=8080 | --mode=loadtest --url=... --clients=N | "
                     + "--mode=compare");
             case "sequential" -> runSequential();
             case "pooled" -> {
@@ -58,9 +65,18 @@ public final class Main {
                 int tokens = Integer.parseInt(argValue(args, "--tokens", "8"));
                 runIndexStress(threads, articles, vocab, tokens);
             }
+            case "serve" -> {
+                int port = Integer.parseInt(argValue(args, "--port", "8080"));
+                runServe(port);
+            }
+            case "loadtest" -> {
+                String url = argValue(args, "--url", "http://localhost:8080/search?q=java&limit=10");
+                int clients = Integer.parseInt(argValue(args, "--clients", "10000"));
+                runLoadTest(url, clients);
+            }
             case "compare" -> runCompare();
             default -> {
-                log.error("Unknown --mode={}. Known modes: info, sequential, pooled, pipeline, index-stress, compare", mode);
+                log.error("Unknown --mode={}. Known modes: info, sequential, pooled, pipeline, index-stress, serve, loadtest, compare", mode);
                 System.exit(2);
             }
         }
@@ -80,6 +96,54 @@ public final class Main {
         List<FeedConfig> feeds = FeedConfigLoader.loadFromClasspath("feeds.yaml");
         new PipelineAggregator(new HttpFeedFetcher(), new RssParser(),
                 fetchers, parsers, queueCap).run(feeds);
+    }
+
+    private static void runServe(int port) {
+        log.info("");
+        log.info("================================================================");
+        log.info("  PHASE 5 — Serve");
+        log.info("================================================================");
+
+        // 1. Use Phase 3 pipeline to fetch + parse all feeds.
+        List<FeedConfig> feeds = FeedConfigLoader.loadFromClasspath("feeds.yaml");
+        int cores = Runtime.getRuntime().availableProcessors();
+        PipelineAggregator.Result pipe = new PipelineAggregator(
+                new HttpFeedFetcher(), new RssParser(), 16, cores, 16).run(feeds);
+
+        // 2. Index them into the SearchableIndex backing the HTTP server.
+        SearchableIndex idx = new SearchableIndex();
+        for (Article a : pipe.articles()) idx.add(a);
+        SearchableIndex.Snapshot s = idx.snapshot();
+        log.info("indexed {} articles, {} tokens, {} postings",
+                s.articles(), s.tokens(), s.postings());
+
+        // 3. Start the server on a virtual-thread executor.
+        SearchServer server = new SearchServer(idx, port);
+        try {
+            server.start();
+        } catch (Exception e) {
+            log.error("failed to start HTTP server on port {}", port, e);
+            return;
+        }
+
+        // 4. Block until SIGINT (Ctrl-C). Shutdown hook releases the latch.
+        CountDownLatch shutdown = new CountDownLatch(1);
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            log.info("shutdown hook fired");
+            server.stop();
+            shutdown.countDown();
+        }, "shutdown-hook"));
+        log.info("Press Ctrl-C to stop");
+        try { shutdown.await(); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); }
+    }
+
+    private static void runLoadTest(String url, int clients) {
+        try {
+            LoadTest.Result r = new LoadTest().run(url, clients, Duration.ofSeconds(10));
+            LoadTest.printSummary(r);
+        } catch (Exception e) {
+            log.error("load test failed", e);
+        }
     }
 
     private static void runIndexStress(int threads, int articles, int vocab, int tokensPerArticle) {
