@@ -4,6 +4,7 @@ import com.newsradar.config.FeedConfig;
 import com.newsradar.config.FeedConfigLoader;
 import com.newsradar.fetch.HttpFeedFetcher;
 import com.newsradar.parse.RssParser;
+import com.newsradar.pipeline.PipelineAggregator;
 import com.newsradar.pipeline.PooledAggregator;
 import com.newsradar.pipeline.SequentialAggregator;
 import org.slf4j.Logger;
@@ -25,15 +26,23 @@ public final class Main {
         String mode = argValue(args, "--mode", "info");
 
         switch (mode) {
-            case "info" -> log.info("Modes: --mode=sequential | --mode=pooled --pool=N | --mode=compare");
+            case "info" -> log.info("Modes: --mode=sequential | --mode=pooled --pool=N | "
+                    + "--mode=pipeline --fetchers=N --parsers=M --queue=K | --mode=compare");
             case "sequential" -> runSequential();
             case "pooled" -> {
                 int pool = Integer.parseInt(argValue(args, "--pool", "8"));
                 runPooled(pool);
             }
+            case "pipeline" -> {
+                int fetchers = Integer.parseInt(argValue(args, "--fetchers", "16"));
+                int parsers = Integer.parseInt(argValue(args, "--parsers",
+                        String.valueOf(Runtime.getRuntime().availableProcessors())));
+                int queue = Integer.parseInt(argValue(args, "--queue", "16"));
+                runPipeline(fetchers, parsers, queue);
+            }
             case "compare" -> runCompare();
             default -> {
-                log.error("Unknown --mode={}. Known modes: info, sequential, pooled, compare", mode);
+                log.error("Unknown --mode={}. Known modes: info, sequential, pooled, pipeline, compare", mode);
                 System.exit(2);
             }
         }
@@ -49,6 +58,12 @@ public final class Main {
         new PooledAggregator(new HttpFeedFetcher(), new RssParser(), poolSize).run(feeds);
     }
 
+    private static void runPipeline(int fetchers, int parsers, int queueCap) {
+        List<FeedConfig> feeds = FeedConfigLoader.loadFromClasspath("feeds.yaml");
+        new PipelineAggregator(new HttpFeedFetcher(), new RssParser(),
+                fetchers, parsers, queueCap).run(feeds);
+    }
+
     private static void runCompare() {
         List<FeedConfig> feeds = FeedConfigLoader.loadFromClasspath("feeds.yaml");
         HttpFeedFetcher fetcher = new HttpFeedFetcher();
@@ -62,6 +77,10 @@ public final class Main {
             PooledAggregator.Result r = new PooledAggregator(fetcher, parser, pool).run(feeds);
             rows.add(new Row("pooled", pool, r.elapsedMillis(), r.articles().size(), r.failedFeeds()));
         }
+
+        int cores = Runtime.getRuntime().availableProcessors();
+        PipelineAggregator.Result pip = new PipelineAggregator(fetcher, parser, 16, cores, 16).run(feeds);
+        rows.add(new Row("pipeline", 16, pip.elapsedMillis(), pip.articles().size(), pip.fetchFailed()));
 
         long baseline = rows.get(0).wallMs;
         log.info("");
