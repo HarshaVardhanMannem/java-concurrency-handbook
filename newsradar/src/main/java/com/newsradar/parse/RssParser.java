@@ -16,11 +16,12 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
-public final class RssParser {
+public class RssParser implements FeedParser {
 
     private static final DateTimeFormatter RFC_822 =
             DateTimeFormatter.ofPattern("EEE, dd MMM yyyy HH:mm:ss zzz", Locale.ENGLISH);
 
+    @Override
     public List<Article> parse(RawFeed raw) {
         String xml = new String(raw.body(), StandardCharsets.UTF_8);
         Document doc = Jsoup.parse(xml, "", Parser.xmlParser());
