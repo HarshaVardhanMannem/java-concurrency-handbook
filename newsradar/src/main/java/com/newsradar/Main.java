@@ -3,6 +3,13 @@ package com.newsradar;
 import com.newsradar.config.FeedConfig;
 import com.newsradar.config.FeedConfigLoader;
 import com.newsradar.fetch.HttpFeedFetcher;
+import com.newsradar.index.ConcurrentIndex;
+import com.newsradar.index.IndexFixture;
+import com.newsradar.index.IndexFixture.StressResult;
+import com.newsradar.index.InvertedIndex;
+import com.newsradar.index.SynchronizedIndex;
+import com.newsradar.index.UnsafeHashMapIndex;
+import com.newsradar.model.Article;
 import com.newsradar.parse.RssParser;
 import com.newsradar.pipeline.PipelineAggregator;
 import com.newsradar.pipeline.PooledAggregator;
@@ -12,6 +19,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Supplier;
 
 public final class Main {
     private static final Logger log = LoggerFactory.getLogger(Main.class);
@@ -27,7 +35,9 @@ public final class Main {
 
         switch (mode) {
             case "info" -> log.info("Modes: --mode=sequential | --mode=pooled --pool=N | "
-                    + "--mode=pipeline --fetchers=N --parsers=M --queue=K | --mode=compare");
+                    + "--mode=pipeline --fetchers=N --parsers=M --queue=K | "
+                    + "--mode=index-stress --threads=N --articles=M --vocab=K --tokens=T | "
+                    + "--mode=compare");
             case "sequential" -> runSequential();
             case "pooled" -> {
                 int pool = Integer.parseInt(argValue(args, "--pool", "8"));
@@ -40,9 +50,17 @@ public final class Main {
                 int queue = Integer.parseInt(argValue(args, "--queue", "16"));
                 runPipeline(fetchers, parsers, queue);
             }
+            case "index-stress" -> {
+                int threads = Integer.parseInt(argValue(args, "--threads",
+                        String.valueOf(Runtime.getRuntime().availableProcessors())));
+                int articles = Integer.parseInt(argValue(args, "--articles", "4000"));
+                int vocab = Integer.parseInt(argValue(args, "--vocab", "200"));
+                int tokens = Integer.parseInt(argValue(args, "--tokens", "8"));
+                runIndexStress(threads, articles, vocab, tokens);
+            }
             case "compare" -> runCompare();
             default -> {
-                log.error("Unknown --mode={}. Known modes: info, sequential, pooled, pipeline, compare", mode);
+                log.error("Unknown --mode={}. Known modes: info, sequential, pooled, pipeline, index-stress, compare", mode);
                 System.exit(2);
             }
         }
@@ -62,6 +80,49 @@ public final class Main {
         List<FeedConfig> feeds = FeedConfigLoader.loadFromClasspath("feeds.yaml");
         new PipelineAggregator(new HttpFeedFetcher(), new RssParser(),
                 fetchers, parsers, queueCap).run(feeds);
+    }
+
+    private static void runIndexStress(int threads, int articles, int vocab, int tokensPerArticle) {
+        log.info("");
+        log.info("================================================================");
+        log.info("  PHASE 4 — Inverted Index Stress");
+        log.info("================================================================");
+        log.info("  threads     : {}", threads);
+        log.info("  articles    : {}", articles);
+        log.info("  per-article : {} tokens drawn from {}-token vocabulary", tokensPerArticle, vocab);
+
+        List<Article> sample = IndexFixture.articles(articles, tokensPerArticle, vocab, 42L);
+        int expectedTokens = IndexFixture.expectedTokens(sample);
+        int expectedPostings = IndexFixture.expectedPostings(sample);
+        log.info("  expected    : tokens={} postings={}", expectedTokens, expectedPostings);
+        log.info("");
+        log.info(String.format("  %-20s %-9s %8s %10s %12s %12s",
+                "impl", "correct?", "tokens", "postings", "elapsed_ms", "ops/sec"));
+        log.info("  ----------------------------------------------------------------------------------");
+
+        for (Supplier<InvertedIndex> ctor : List.of(
+                (Supplier<InvertedIndex>) UnsafeHashMapIndex::new,
+                (Supplier<InvertedIndex>) SynchronizedIndex::new,
+                (Supplier<InvertedIndex>) ConcurrentIndex::new)) {
+            try {
+                StressResult r = IndexFixture.stress(ctor.get(), sample, threads);
+                String correct = r.firstException() != null
+                        ? "THREW " + r.firstException().getClass().getSimpleName()
+                        : (r.isCorrect() ? "yes" : "NO");
+                log.info(String.format("  %-20s %-9s %8d %10d %12d %12d",
+                        r.impl(), correct, r.tokens(), r.postings(),
+                        r.elapsedMillis(), r.opsPerSecond()));
+            } catch (Exception e) {
+                log.warn("stress run failed: {}", e.toString());
+            }
+        }
+
+        log.info("");
+        log.info("LESSON");
+        log.info("  UnsafeHashMap  : data race on get-then-put loses postings (sometimes throws).");
+        log.info("  Synchronized   : correct, but every call serialises through one monitor.");
+        log.info("  Concurrent     : ConcurrentHashMap.computeIfAbsent + newKeySet — correct & scales.");
+        log.info("");
     }
 
     private static void runCompare() {
