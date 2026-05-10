@@ -98,7 +98,7 @@ graceful shutdown idiom.
 
 ---
 
-## Phase 3 — Bounded-queue pipeline (producer–consumer)
+## Phase 3 — Bounded-queue pipeline (producer–consumer) (✅ done)
 
 **Goal:** decouple stages and apply backpressure.
 
