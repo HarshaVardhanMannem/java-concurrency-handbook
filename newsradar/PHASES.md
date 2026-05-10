@@ -153,7 +153,7 @@ when `ReadWriteLock` matters.
 
 ---
 
-## Phase 6 — Scheduled refresh + graceful shutdown
+## Phase 6 — Scheduled refresh + graceful shutdown (✅ done)
 
 **Goal:** treat NewsRadar like a real service.
 
