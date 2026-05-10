@@ -118,7 +118,7 @@ why bounded queues > unbounded.
 
 ---
 
-## Phase 4 — Thread-safe inverted index
+## Phase 4 — Thread-safe inverted index (✅ done)
 
 **Goal:** see shared mutable state break and learn the three fixes.
 
