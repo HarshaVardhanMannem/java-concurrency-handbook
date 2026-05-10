@@ -17,6 +17,7 @@ import com.newsradar.parse.RssParser;
 import com.newsradar.pipeline.PipelineAggregator;
 import com.newsradar.pipeline.PooledAggregator;
 import com.newsradar.pipeline.SequentialAggregator;
+import com.newsradar.service.ScheduledRefresher;
 
 import java.time.Duration;
 import java.util.concurrent.CountDownLatch;
@@ -43,8 +44,9 @@ public final class Main {
             case "info" -> log.info("Modes: --mode=sequential | --mode=pooled --pool=N | "
                     + "--mode=pipeline --fetchers=N --parsers=M --queue=K | "
                     + "--mode=index-stress --threads=N --articles=M --vocab=K --tokens=T | "
-                    + "--mode=serve --port=8080 | --mode=loadtest --url=... --clients=N | "
-                    + "--mode=compare");
+                    + "--mode=serve --port=8080 | "
+                    + "--mode=service --port=8080 --refresh=30 --fetchers=16 --parsers=N --queue=16 | "
+                    + "--mode=loadtest --url=... --clients=N | --mode=compare");
             case "sequential" -> runSequential();
             case "pooled" -> {
                 int pool = Integer.parseInt(argValue(args, "--pool", "8"));
@@ -69,6 +71,15 @@ public final class Main {
                 int port = Integer.parseInt(argValue(args, "--port", "8080"));
                 runServe(port);
             }
+            case "service" -> {
+                int cores = Runtime.getRuntime().availableProcessors();
+                int port = Integer.parseInt(argValue(args, "--port", "8080"));
+                int refresh = Integer.parseInt(argValue(args, "--refresh", "30"));
+                int fetchers = Integer.parseInt(argValue(args, "--fetchers", "16"));
+                int parsers = Integer.parseInt(argValue(args, "--parsers", String.valueOf(cores)));
+                int queue = Integer.parseInt(argValue(args, "--queue", "16"));
+                runService(port, refresh, fetchers, parsers, queue);
+            }
             case "loadtest" -> {
                 String url = argValue(args, "--url", "http://localhost:8080/search?q=java&limit=10");
                 int clients = Integer.parseInt(argValue(args, "--clients", "10000"));
@@ -76,7 +87,7 @@ public final class Main {
             }
             case "compare" -> runCompare();
             default -> {
-                log.error("Unknown --mode={}. Known modes: info, sequential, pooled, pipeline, index-stress, serve, loadtest, compare", mode);
+                log.error("Unknown --mode={}. Known modes: info, sequential, pooled, pipeline, index-stress, serve, service, loadtest, compare", mode);
                 System.exit(2);
             }
         }
@@ -134,6 +145,72 @@ public final class Main {
             shutdown.countDown();
         }, "shutdown-hook"));
         log.info("Press Ctrl-C to stop");
+        try { shutdown.await(); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); }
+    }
+
+    private static void runService(int port, int refreshSec, int fetchers, int parsers, int queue) {
+        log.info("");
+        log.info("================================================================");
+        log.info("  PHASE 6 — Service (scheduled refresh + graceful shutdown)");
+        log.info("================================================================");
+        log.info("  port             : {}", port);
+        log.info("  refresh interval : {} s", refreshSec);
+        log.info("  pipeline pools   : fetchers={} parsers={} queue={}", fetchers, parsers, queue);
+        log.info("");
+
+        List<FeedConfig> feeds = FeedConfigLoader.loadFromClasspath("feeds.yaml");
+        HttpFeedFetcher fetcher = new HttpFeedFetcher();
+        RssParser parser = new RssParser();
+        SearchableIndex idx = new SearchableIndex();
+
+        ScheduledRefresher refresher = new ScheduledRefresher(
+                idx, feeds, fetcher, parser, fetchers, parsers, queue,
+                Duration.ofSeconds(refreshSec));
+        refresher.start();
+
+        // CountDownLatch in disguise — block the main thread until refresh #1 finishes
+        // (success or failure) so /search never returns an empty index on cold start.
+        log.info("waiting for first refresh to populate the index...");
+        try {
+            if (!refresher.awaitFirstRefresh(Duration.ofMinutes(2))) {
+                log.error("first refresh did not complete within 2 minutes — aborting startup");
+                refresher.stop();
+                return;
+            }
+        } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
+            refresher.stop();
+            return;
+        }
+
+        SearchServer server = new SearchServer(idx, refresher, port);
+        try {
+            server.start();
+        } catch (Exception e) {
+            log.error("failed to start HTTP server on port {}", port, e);
+            refresher.stop();
+            return;
+        }
+
+        // Ordered shutdown: stop accepting requests, then stop the refresher.
+        // Reverse of startup order — same idea as nesting try-with-resources.
+        CountDownLatch shutdown = new CountDownLatch(1);
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            log.info("");
+            log.info("shutdown hook fired — graceful shutdown begins");
+            try {
+                server.stop();      // 1. close listening socket, drain in-flight exchanges
+                refresher.stop();   // 2. cancel schedule, await in-flight refresh
+            } catch (Throwable t) {
+                log.warn("shutdown encountered: {}", t.toString());
+            } finally {
+                log.info("shutdown complete");
+                shutdown.countDown();
+            }
+        }, "shutdown-hook"));
+
+        log.info("service ready — Ctrl-C to stop");
+        log.info("");
         try { shutdown.await(); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); }
     }
 
