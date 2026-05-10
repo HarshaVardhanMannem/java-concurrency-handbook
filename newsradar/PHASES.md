@@ -137,7 +137,7 @@ under load, lock-free collections.
 
 ---
 
-## Phase 5 — HTTP search API on virtual threads
+## Phase 5 — HTTP search API on virtual threads (✅ done)
 
 **Goal:** modern Java I/O concurrency.
 
