@@ -2,6 +2,7 @@ package com.newsradar.http;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.newsradar.index.SearchableIndex;
+import com.newsradar.service.ScheduledRefresher;
 import com.sun.net.httpserver.HttpServer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,13 +23,19 @@ public final class SearchServer {
     private static final Logger log = LoggerFactory.getLogger(SearchServer.class);
 
     private final SearchableIndex index;
+    private final ScheduledRefresher refresher;   // nullable — Phase 5 wiring has none
     private final int port;
     private final ObjectMapper json = new ObjectMapper();
     private HttpServer server;
     private ExecutorService exec;
 
     public SearchServer(SearchableIndex index, int port) {
+        this(index, null, port);
+    }
+
+    public SearchServer(SearchableIndex index, ScheduledRefresher refresher, int port) {
         this.index = index;
+        this.refresher = refresher;
         this.port = port;
     }
 
@@ -43,7 +50,7 @@ public final class SearchServer {
         server.setExecutor(exec);
 
         server.createContext("/search", new SearchHandler(index, json));
-        server.createContext("/health", new HealthHandler(index, json));
+        server.createContext("/health", new HealthHandler(index, refresher, json));
         server.start();
         log.info("HTTP server listening on http://localhost:{}", boundPort());
         log.info("  GET /search?q=<query>&limit=<n>");
