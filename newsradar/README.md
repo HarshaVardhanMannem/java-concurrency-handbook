@@ -79,7 +79,7 @@ Every box on that diagram is a real class in `src/main/java/com/newsradar/`. Eve
 | Phase | Topic | Key Concepts | Status |
 |:---:|---|---|:---:|
 | **0** | Maven scaffold + logging | Project layout, Logback, JUnit 5 | ✅ |
-| **1** | Sequential baseline | Blocking I/O cost, `HttpClient.send()` | ✅ |
+| **1** | Sequential baseline | Blocking I/O cost, `HttpClient.send()` | ✅ · [docs](docs/PHASE_01.md) |
 | **2** | Thread pool fetcher | `ExecutorService`, `Future`, graceful shutdown | ✅ · [docs](docs/PHASE_02.md) |
 | **3** | Bounded-queue pipeline | `BlockingQueue`, backpressure, poison pills | ✅ · [docs](docs/PHASE_03.md) |
 | **4** | Thread-safe inverted index | `ConcurrentHashMap.computeIfAbsent`, `synchronized` foot-gun | ✅ · [docs](docs/PHASE_04.md) |
@@ -241,6 +241,7 @@ clients   wall_ms   success   failed   throughput   p50_µs   p99_µs
 
 Deep-dive docs in [`docs/`](docs/) explain the *why* behind every design decision:
 
+- **[PHASE_01.md](docs/PHASE_01.md)** — sequential baseline, blocking I/O, head-of-line blocking, and baseline performance metrics
 - **[PHASE_02.md](docs/PHASE_02.md)** — `ExecutorService`, `Callable<T>`, `Future`, graceful shutdown idiom, pool-size ladder
 - **[PHASE_03.md](docs/PHASE_03.md)** — `ArrayBlockingQueue`, bounded vs unbounded queues, poison-pill propagation, backpressure mechanics
 - **[PHASE_04.md](docs/PHASE_04.md)** — three-way inverted index: HashMap (broken), `synchronized` (slow), `ConcurrentHashMap.computeIfAbsent` (correct + scales)
