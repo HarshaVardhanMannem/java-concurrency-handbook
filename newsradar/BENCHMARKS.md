@@ -36,7 +36,7 @@ This is the primitive every other benchmark builds on.
 
 **What to notice:** throughput scales inversely with text length — 10× more text, ~10× fewer ops/s. Tokenization is O(n) in the number of characters, as expected.
 
-At 135K article-bodies/second on one thread, the tokenizer is **not** the bottleneck — network I/O is orders of magnitude slower.
+At 135K article-bodies/second on one thread, the tokenizer is **not** the bottleneck — network I/O is orders of magnitude 
 
 ---
 

@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(where mvn *)",
+      "Bash(mvn -q -o test)",
+      "Bash(mvn -o test)",
+      "Bash(curl -s \"http://localhost:8088/search?q=news&limit=5\")",
+      "Bash(curl -s \"http://localhost:8088/search?q=trump&limit=5\")",
+      "Bash(mvn -q exec:java \"-Dexec.args=--mode=loadtest --url=http://localhost:8088/search?q=news&limit=5 --clients=10000\")",
+      "Bash(tee /tmp/phase5_loadtest.log)",
+      "Bash(mvn -q -B test)",
+      "Bash(mvn test-compile *)",
+      "PowerShell(Head *)",
+      "PowerShell(Get-ChildItem \"C:\\\\Users\\\\harsh\\\\Downloads\\\\Concurrency\\\\newsradar\\\\target\\\\generated-test-sources\\\\test-annotations\" -Recurse | ForEach-Object { $_.FullName })"
+    ]
+  }
+}
