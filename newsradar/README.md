@@ -5,7 +5,7 @@
 
 [![Java](https://img.shields.io/badge/Java-21%2B-ED8B00?logo=openjdk&logoColor=white)](https://openjdk.org/projects/jdk/21/)
 [![Maven](https://img.shields.io/badge/Maven-3.9%2B-C71A36?logo=apachemaven&logoColor=white)](https://maven.apache.org/)
-[![Phases](https://img.shields.io/badge/Phases-5%20of%207%20complete-brightgreen)](#progress)
+[![Phases](https://img.shields.io/badge/Phases-6%20of%207%20complete-brightgreen)](#progress)
 
 ---
 
@@ -84,8 +84,8 @@ Every box on that diagram is a real class in `src/main/java/com/newsradar/`. Eve
 | **3** | Bounded-queue pipeline | `BlockingQueue`, backpressure, poison pills | ✅ · [docs](docs/PHASE_03.md) |
 | **4** | Thread-safe inverted index | `ConcurrentHashMap.computeIfAbsent`, `synchronized` foot-gun | ✅ · [docs](docs/PHASE_04.md) |
 | **5** | HTTP search API on virtual threads | `newVirtualThreadPerTaskExecutor`, `ReadWriteLock`, p50/p99 | ✅ · [docs](docs/PHASE_05.md) |
-| **6** | Scheduled refresh + shutdown | `ScheduledExecutorService`, `CountDownLatch` | 🔜 Next |
-| **7** | JMH benchmarks | Measure, don't guess | ⬜ |
+| **6** | Scheduled refresh + shutdown | `ScheduledExecutorService`, `CountDownLatch` | ✅ |
+| **7** | JMH benchmarks | Measure, don't guess | 🔜 Next |
 
 > Full roadmap with goals, code snippets, and expected outputs: **[PHASES.md](PHASES.md)**
 
@@ -141,6 +141,10 @@ curl "http://localhost:8088/health"
 curl "http://localhost:8088/search?q=java&limit=5"
 mvn exec:java "-Dexec.args=--mode=loadtest --url=http://localhost:8088/search?q=news --clients=2000"
 
+# Phase 6 — long-running service with scheduled refresh + graceful shutdown
+mvn exec:java "-Dexec.args=--mode=service --port=8088 --refresh=30 --fetchers=16"
+# (Ctrl-C triggers the ordered shutdown hook)
+
 # Side-by-side comparison of fetch strategies
 mvn exec:java "-Dexec.args=--mode=compare"
 ```
@@ -174,19 +178,21 @@ newsradar/
     │   ├── pipeline/               SequentialAggregator (P1) │ PooledAggregator (P2) │ PipelineAggregator (P3)
     │   ├── index/                  Tokenizer │ InvertedIndex + 3 impls │ SearchableIndex (P4–5)
     │   ├── http/                   SearchServer │ SearchHandler │ HealthHandler │ LoadTest (P5)
+    │   ├── service/                ScheduledRefresher (P6)
     │   └── util/                   Stopwatch
     │
     ├── main/resources/
     │   ├── feeds.yaml              20 real public RSS feeds
     │   └── logback.xml             structured console logging
     │
-    └── test/java/com/newsradar/    26 tests across 9 classes
+    └── test/java/com/newsradar/    30 tests across 10 classes
         ├── MainTest
         ├── config/FeedConfigLoaderTest
         ├── parse/RssParserTest
         ├── pipeline/PooledAggregatorTest │ PipelineAggregatorTest
         ├── index/IndexCorrectnessTest │ IndexStressTest │ SearchableIndexTest
-        └── http/SearchServerTest
+        ├── http/SearchServerTest
+        └── service/ScheduledRefresherTest
 ```
 
 ---
@@ -237,6 +243,19 @@ clients   wall_ms   success   failed   throughput   p50_µs   p99_µs
 
 ---
 
+### Phase 6 — scheduled refresh (correctness)
+
+```
+First refresh completes in < 2 s (20 feeds, pipeline fetchers=16)
+CountDownLatch released → server starts serving
+Ctrl-C → shutdown hook fires:
+  server.stop()     ← close socket, drain in-flight requests
+  refresher.stop()  ← cancel schedule, await in-flight refresh
+  shutdown complete ← clean exit, no thread leaks
+```
+
+---
+
 ## Phase Write-ups
 
 Deep-dive docs in [`docs/`](docs/) explain the *why* behind every design decision:
@@ -246,6 +265,7 @@ Deep-dive docs in [`docs/`](docs/) explain the *why* behind every design decisio
 - **[PHASE_03.md](docs/PHASE_03.md)** — `ArrayBlockingQueue`, bounded vs unbounded queues, poison-pill propagation, backpressure mechanics
 - **[PHASE_04.md](docs/PHASE_04.md)** — three-way inverted index: HashMap (broken), `synchronized` (slow), `ConcurrentHashMap.computeIfAbsent` (correct + scales)
 - **[PHASE_05.md](docs/PHASE_05.md)** — virtual threads vs platform threads, `ReadWriteLock` for index swaps, p50/p99 latency under 2,000-concurrent load
+- **Phase 6** — covered in [PHASES.md](PHASES.md): `ScheduledExecutorService`, `CountDownLatch` startup gate, ordered shutdown, atomics for lock-free `/health` stats
 
 ---
 

@@ -5,7 +5,7 @@
 [![Java](https://img.shields.io/badge/Java-21%2B-ED8B00?logo=openjdk&logoColor=white)](https://openjdk.org/projects/jdk/21/)
 [![Maven](https://img.shields.io/badge/Maven-3.9%2B-C71A36?logo=apachemaven&logoColor=white)](https://maven.apache.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Phases](https://img.shields.io/badge/Phases-5%20of%207%20complete-brightgreen)](#learning-path)
+[![Phases](https://img.shields.io/badge/Phases-6%20of%207%20complete-brightgreen)](#learning-path)
 
 ---
 
@@ -106,8 +106,8 @@ Each phase builds directly on the last. Every concept is first **motivated** (wh
 | **3** | Bounded-queue pipeline | `BlockingQueue`, backpressure, poison pills | ✅ Done |
 | **4** | Thread-safe inverted index | `ConcurrentHashMap`, `synchronized`, lock-free | ✅ Done |
 | **5** | HTTP search API | Virtual threads, `ReadWriteLock`, load testing | ✅ Done |
-| **6** | Scheduled refresh + shutdown | `ScheduledExecutorService`, `CountDownLatch` | 🔜 Next |
-| **7** | JMH benchmark write-up | Measuring, not guessing | ⬜ |
+| **6** | Scheduled refresh + shutdown | `ScheduledExecutorService`, `CountDownLatch` | ✅ Done |
+| **7** | JMH benchmark write-up | Measuring, not guessing | 🔜 Next |
 
 > Detailed write-ups for each completed phase live in [`newsradar/docs/`](newsradar/docs/).
 
@@ -132,6 +132,12 @@ The [`docs/CONCEPTS.md`](docs/CONCEPTS.md) file is a standalone reference coveri
 - `Callable<List<Article>>` submitted to a fixed thread pool
 - `Future.get()` with per-task timeout
 - Pool size ladder: 4 / 8 / 16 / 32 — see where gains flatten
+
+### Phase 6 — Scheduled Refresh + Graceful Shutdown
+- `ScheduledExecutorService.scheduleAtFixedRate` re-fetches all feeds every 30 s
+- `CountDownLatch` gates startup — `/search` never returns an empty index on cold start
+- Ordered shutdown hook: stop server → stop refresher → `awaitTermination` → `shutdownNow`
+- Atomics (`AtomicLong`, `AtomicBoolean`) expose refresh stats to `/health` without locking
 
 ### Phase 5 — Virtual-Thread HTTP Server · [load tested](newsradar/docs/PHASE_05.md)
 - `com.sun.net.httpserver` backed by `newVirtualThreadPerTaskExecutor`
@@ -177,6 +183,9 @@ mvn exec:java                                                  # Phase 0 smoke t
 mvn exec:java "-Dexec.args=--mode=sequential"                 # Phase 1 — slow on purpose
 mvn exec:java "-Dexec.args=--mode=pooled --pool=16"           # Phase 2 — thread pool
 mvn exec:java "-Dexec.args=--mode=pipeline --fetchers=16"     # Phase 3 — pipeline
+mvn exec:java "-Dexec.args=--mode=index-stress --threads=16"  # Phase 4 — index stress
+mvn exec:java "-Dexec.args=--mode=serve --port=8088"          # Phase 5 — serve + search
+mvn exec:java "-Dexec.args=--mode=service --port=8088 --refresh=30"  # Phase 6 — live service
 mvn exec:java "-Dexec.args=--mode=compare"                    # all modes, side-by-side
 mvn test                                                       # run all tests
 ```
@@ -185,8 +194,7 @@ mvn test                                                       # run all tests
 
 ## 🗺️ Roadmap
 
-- [x] Phase 0–5 complete with deep-dive write-ups
-- [ ] Phase 6 — `ScheduledExecutorService` + ordered shutdown hook
+- [x] Phase 0–6 complete with deep-dive write-ups
 - [ ] Phase 7 — JMH benchmark suite + `BENCHMARKS.md` trophy
 
 ---
