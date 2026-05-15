@@ -5,7 +5,7 @@
 [![Java](https://img.shields.io/badge/Java-21%2B-ED8B00?logo=openjdk&logoColor=white)](https://openjdk.org/projects/jdk/21/)
 [![Maven](https://img.shields.io/badge/Maven-3.9%2B-C71A36?logo=apachemaven&logoColor=white)](https://maven.apache.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Phases](https://img.shields.io/badge/Phases-3%20of%207%20complete-brightgreen)](#learning-path)
+[![Phases](https://img.shields.io/badge/Phases-4%20of%207%20complete-brightgreen)](#learning-path)
 
 ---
 
@@ -38,7 +38,8 @@ java-concurrency-handbook/
     ├── PHASES.md               ← full phase-by-phase learning roadmap
     ├── docs/
     │   ├── PHASE_02.md         ← deep-dive: thread pool fetcher
-    │   └── PHASE_03.md         ← deep-dive: bounded-queue pipeline
+    │   ├── PHASE_03.md         ← deep-dive: bounded-queue pipeline
+    │   └── PHASE_04.md         ← deep-dive: thread-safe inverted index
     └── src/...
 ```
 
@@ -102,8 +103,8 @@ Each phase builds directly on the last. Every concept is first **motivated** (wh
 | **1** | Sequential baseline | Blocking I/O cost, `HttpClient.send()` | ✅ Done |
 | **2** | Thread pool fetcher | `ExecutorService`, `Future`, graceful shutdown | ✅ Done |
 | **3** | Bounded-queue pipeline | `BlockingQueue`, backpressure, poison pills | ✅ Done |
-| **4** | Thread-safe inverted index | `ConcurrentHashMap`, `synchronized`, lock-free | 🔜 Next |
-| **5** | HTTP search API | Virtual threads, `ReadWriteLock`, load testing | ⬜ |
+| **4** | Thread-safe inverted index | `ConcurrentHashMap`, `synchronized`, lock-free | ✅ Done |
+| **5** | HTTP search API | Virtual threads, `ReadWriteLock`, load testing | 🔜 Next |
 | **6** | Scheduled refresh + shutdown | `ScheduledExecutorService`, `CountDownLatch` | ⬜ |
 | **7** | JMH benchmark write-up | Measuring, not guessing | ⬜ |
 
@@ -130,6 +131,11 @@ The [`docs/CONCEPTS.md`](docs/CONCEPTS.md) file is a standalone reference coveri
 - `Callable<List<Article>>` submitted to a fixed thread pool
 - `Future.get()` with per-task timeout
 - Pool size ladder: 4 / 8 / 16 / 32 — see where gains flatten
+
+### Phase 4 — Thread-Safe Inverted Index · [stress-tested](newsradar/docs/PHASE_04.md)
+- Three implementations compared: `HashMap` (broken), `synchronized` (slow), `ConcurrentHashMap.computeIfAbsent` (correct + fast)
+- 16 threads × 50,000 articles × 20 tokens — `ConcurrentIndex` is **2.6× faster** than `SynchronizedIndex`
+- `SearchableIndex` wraps the whole index behind a `ReentrantReadWriteLock` for atomic snapshots
 
 ### Phase 3 — Bounded-Queue Pipeline · [backpressure, live](newsradar/docs/PHASE_03.md)
 - Two `ArrayBlockingQueue`s connect three independent stages
@@ -173,8 +179,7 @@ mvn test                                                       # run all tests
 
 ## 🗺️ Roadmap
 
-- [x] Phase 0–3 complete with deep-dive write-ups
-- [ ] Phase 4 — `ConcurrentHashMap` inverted index + stress tests
+- [x] Phase 0–4 complete with deep-dive write-ups
 - [ ] Phase 5 — virtual-thread HTTP server + `ReadWriteLock`
 - [ ] Phase 6 — `ScheduledExecutorService` + ordered shutdown hook
 - [ ] Phase 7 — JMH benchmark suite + `BENCHMARKS.md` trophy
