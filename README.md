@@ -5,7 +5,7 @@
 [![Java](https://img.shields.io/badge/Java-21%2B-ED8B00?logo=openjdk&logoColor=white)](https://openjdk.org/projects/jdk/21/)
 [![Maven](https://img.shields.io/badge/Maven-3.9%2B-C71A36?logo=apachemaven&logoColor=white)](https://maven.apache.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Phases](https://img.shields.io/badge/Phases-6%20of%207%20complete-brightgreen)](#learning-path)
+[![Phases](https://img.shields.io/badge/Phases-7%20of%207%20complete-brightgreen)](#learning-path)
 
 ---
 
@@ -107,7 +107,7 @@ Each phase builds directly on the last. Every concept is first **motivated** (wh
 | **4** | Thread-safe inverted index | `ConcurrentHashMap`, `synchronized`, lock-free | ✅ Done |
 | **5** | HTTP search API | Virtual threads, `ReadWriteLock`, load testing | ✅ Done |
 | **6** | Scheduled refresh + shutdown | `ScheduledExecutorService`, `CountDownLatch` | ✅ Done |
-| **7** | JMH benchmark write-up | Measuring, not guessing | 🔜 Next |
+| **7** | JMH benchmark write-up | Measuring, not guessing | ✅ Done |
 
 > Detailed write-ups for each completed phase live in [`newsradar/docs/`](newsradar/docs/).
 
@@ -132,6 +132,11 @@ The [`docs/CONCEPTS.md`](docs/CONCEPTS.md) file is a standalone reference coveri
 - `Callable<List<Article>>` submitted to a fixed thread pool
 - `Future.get()` with per-task timeout
 - Pool size ladder: 4 / 8 / 16 / 32 — see where gains flatten
+
+### Phase 7 — JMH Benchmarks · [results](newsradar/BENCHMARKS.md)
+- 4 benchmark classes: `TokenizerBenchmark`, `IndexWriteBenchmark`, `SearchableIndexBenchmark`, `AggregatorBenchmark`
+- Key finding: `ConcurrentIndex` is **6× faster** than `SynchronizedIndex` under 8-thread write load
+- Key finding: thread-pool speedup nearly **vanishes** without I/O — parallelism only pays when tasks block
 
 ### Phase 6 — Scheduled Refresh + Graceful Shutdown
 - `ScheduledExecutorService.scheduleAtFixedRate` re-fetches all feeds every 30 s
@@ -194,8 +199,7 @@ mvn test                                                       # run all tests
 
 ## 🗺️ Roadmap
 
-- [x] Phase 0–6 complete with deep-dive write-ups
-- [ ] Phase 7 — JMH benchmark suite + `BENCHMARKS.md` trophy
+- [x] All 7 phases complete — `BENCHMARKS.md` is the trophy
 
 ---
 

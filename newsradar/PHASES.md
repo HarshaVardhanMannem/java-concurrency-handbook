@@ -168,7 +168,7 @@ ordered shutdown, `CountDownLatch`.
 
 ---
 
-## Phase 7 — JMH benchmark write-up
+## Phase 7 — JMH benchmark write-up (✅ done)
 
 **Goal:** prove every choice with numbers.
 

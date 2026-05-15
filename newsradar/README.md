@@ -5,7 +5,7 @@
 
 [![Java](https://img.shields.io/badge/Java-21%2B-ED8B00?logo=openjdk&logoColor=white)](https://openjdk.org/projects/jdk/21/)
 [![Maven](https://img.shields.io/badge/Maven-3.9%2B-C71A36?logo=apachemaven&logoColor=white)](https://maven.apache.org/)
-[![Phases](https://img.shields.io/badge/Phases-6%20of%207%20complete-brightgreen)](#progress)
+[![Phases](https://img.shields.io/badge/Phases-7%20of%207%20complete-brightgreen)](#progress)
 
 ---
 
@@ -85,7 +85,7 @@ Every box on that diagram is a real class in `src/main/java/com/newsradar/`. Eve
 | **4** | Thread-safe inverted index | `ConcurrentHashMap.computeIfAbsent`, `synchronized` foot-gun | ✅ · [docs](docs/PHASE_04.md) |
 | **5** | HTTP search API on virtual threads | `newVirtualThreadPerTaskExecutor`, `ReadWriteLock`, p50/p99 | ✅ · [docs](docs/PHASE_05.md) |
 | **6** | Scheduled refresh + shutdown | `ScheduledExecutorService`, `CountDownLatch` | ✅ |
-| **7** | JMH benchmarks | Measure, don't guess | 🔜 Next |
+| **7** | JMH benchmarks | Measure, don't guess | ✅ · [BENCHMARKS.md](BENCHMARKS.md) |
 
 > Full roadmap with goals, code snippets, and expected outputs: **[PHASES.md](PHASES.md)**
 
@@ -145,6 +145,11 @@ mvn exec:java "-Dexec.args=--mode=loadtest --url=http://localhost:8088/search?q=
 mvn exec:java "-Dexec.args=--mode=service --port=8088 --refresh=30 --fetchers=16"
 # (Ctrl-C triggers the ordered shutdown hook)
 
+# Phase 7 — JMH benchmarks (in-process; results written to target/jmh-results.json)
+mvn test-compile exec:java -Pbench
+# Run a single benchmark class
+mvn exec:java -Pbench "-Dexec.args=IndexWriteBenchmark"
+
 # Side-by-side comparison of fetch strategies
 mvn exec:java "-Dexec.args=--mode=compare"
 ```
@@ -192,7 +197,8 @@ newsradar/
         ├── pipeline/PooledAggregatorTest │ PipelineAggregatorTest
         ├── index/IndexCorrectnessTest │ IndexStressTest │ SearchableIndexTest
         ├── http/SearchServerTest
-        └── service/ScheduledRefresherTest
+        ├── service/ScheduledRefresherTest
+        └── bench/                  TokenizerBenchmark │ IndexWriteBenchmark │ SearchableIndexBenchmark │ AggregatorBenchmark │ BenchmarkRunner
 ```
 
 ---
@@ -243,6 +249,25 @@ clients   wall_ms   success   failed   throughput   p50_µs   p99_µs
 
 ---
 
+### Phase 7 — JMH benchmarks (summary)
+
+```
+Benchmark                             Mode   Score           Units
+IndexWriteBenchmark.concurrentWrite   thrpt  1,512,033 ops/s   ← 6× faster than synchronized
+IndexWriteBenchmark.synchronizedWrite thrpt    251,447 ops/s
+SearchableIndexBenchmark.readOnly     thrpt  1,309,850 ops/s   ← 8 readers, zero writers
+SearchableIndexBenchmark.mixed        thrpt  2,029,870 ops/s   ← 7 readers + 1 periodic writer
+AggregatorBenchmark.sequential         avgt      1.503 ms/op
+AggregatorBenchmark.pooled             avgt      1.274 ms/op   ← barely faster w/o I/O wait
+AggregatorBenchmark.pipeline           avgt      1.792 ms/op   ← slower w/o I/O (queue overhead)
+```
+
+**Key lesson:** thread pools and pipelines are I/O-concurrency tools. The 28× real-world speedup came from overlapping network waits — not from CPUs running faster.
+
+→ **[Full write-up with analysis →](BENCHMARKS.md)**
+
+---
+
 ### Phase 6 — scheduled refresh (correctness)
 
 ```
@@ -266,6 +291,7 @@ Deep-dive docs in [`docs/`](docs/) explain the *why* behind every design decisio
 - **[PHASE_04.md](docs/PHASE_04.md)** — three-way inverted index: HashMap (broken), `synchronized` (slow), `ConcurrentHashMap.computeIfAbsent` (correct + scales)
 - **[PHASE_05.md](docs/PHASE_05.md)** — virtual threads vs platform threads, `ReadWriteLock` for index swaps, p50/p99 latency under 2,000-concurrent load
 - **Phase 6** — covered in [PHASES.md](PHASES.md): `ScheduledExecutorService`, `CountDownLatch` startup gate, ordered shutdown, atomics for lock-free `/health` stats
+- **[BENCHMARKS.md](BENCHMARKS.md)** — Phase 7 trophy: JMH results for tokenizer, index writes, read-write lock, and aggregator strategies with full analysis
 
 ---
 
