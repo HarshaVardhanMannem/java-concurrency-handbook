@@ -67,26 +67,15 @@ java -cp out ConcurrencyFlow 30 120 10        # taskCount sleepMillis poolSize
 
 **NewsRadar** is a concurrent news aggregator that fetches, parses, and indexes RSS feeds — built one concurrency primitive at a time across 7 phases.
 
-```
-                  ┌──────────────────────────────────────────┐
-                  │               NewsRadar JVM              │
-                  │                                          │
-   feeds.yaml ──▶ │  Scheduler  ──every 30s──▶  Fetcher Pool │
-                  │                             (HTTP, I/O)  │
-                  │                                  │        │
-                  │                                  ▼        │
-                  │                        ArrayBlockingQueue  │
-                  │                                  │        │
-                  │                                  ▼        │
-                  │                           Parser Pool     │
-                  │                           (CPU-bound)     │
-                  │                                  │        │
-                  │                                  ▼        │
-                  │                       ConcurrentHashMap   │
-                  │                        (Inverted Index)   │
-                  │                                  ▲        │
-   GET /search?q──┼──▶  HTTP Server (virtual threads) ───────┤
-                  └──────────────────────────────────────────┘
+```mermaid
+flowchart LR
+  A[feeds.yaml] --> B[Scheduler]
+  B -->|every 30s| C[Fetcher Pool<br/>(HTTP, I/O)]
+  C --> D[ArrayBlockingQueue]
+  D --> E[Parser Pool<br/>(CPU-bound)]
+  E --> F[ConcurrentHashMap<br/>(Inverted Index)]
+  G[GET /search?q=...] --> H[HTTP Server<br/>(virtual threads)]
+  H --> F
 ```
 
 → **[Jump to NewsRadar →](newsradar/)**  
