@@ -70,11 +70,11 @@ java -cp out ConcurrencyFlow 30 120 10        # taskCount sleepMillis poolSize
 ```mermaid
 flowchart LR
   A[feeds.yaml] --> B[Scheduler]
-  B -->|every 30s| C[Fetcher Pool<br/>(HTTP, I/O)]
+  B -->|every 30s| C["Fetcher Pool (HTTP, I/O)"]
   C --> D[ArrayBlockingQueue]
-  D --> E[Parser Pool<br/>(CPU-bound)]
-  E --> F[ConcurrentHashMap<br/>(Inverted Index)]
-  G[GET /search?q=...] --> H[HTTP Server<br/>(virtual threads)]
+  D --> E["Parser Pool (CPU-bound)"]
+  E --> F["ConcurrentHashMap (Inverted Index)"]
+  G["GET /search?q=..."] --> H["HTTP Server (virtual threads)"]
   H --> F
 ```
 
