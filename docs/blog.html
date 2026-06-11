@@ -1,0 +1,1016 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Java Concurrency in Practice: From Blocking I/O to Virtual Threads</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@300;400;500;600&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --ink: #1a1815;
+    --ink-muted: #5c5954;
+    --ink-faint: #9a9691;
+    --paper: #faf9f7;
+    --paper-warm: #f3f1ec;
+    --paper-rule: #e8e5de;
+    --accent: #c0392b;
+    --accent-soft: #fdf0ee;
+    --code-bg: #f0ede6;
+    --code-border: #dedad2;
+    --link: #2563eb;
+    --serif: 'Lora', Georgia, serif;
+    --sans: 'DM Sans', system-ui, sans-serif;
+    --mono: 'Fira Code', 'Cascadia Code', Consolas, monospace;
+    --max-w: 740px;
+  }
+
+  body {
+    font-family: var(--serif);
+    background: var(--paper);
+    color: var(--ink);
+    line-height: 1.8;
+    font-size: 18px;
+  }
+
+  .masthead {
+    border-bottom: 1px solid var(--paper-rule);
+    padding: 1.25rem 2rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-family: var(--sans);
+    font-size: 13px;
+    color: var(--ink-muted);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .masthead-dot {
+    width: 4px; height: 4px;
+    border-radius: 50%;
+    background: var(--ink-faint);
+    display: inline-block;
+  }
+
+  .hero {
+    max-width: var(--max-w);
+    margin: 0 auto;
+    padding: 4rem 2rem 2.5rem;
+  }
+
+  .category-tag {
+    font-family: var(--sans);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 1.25rem;
+  }
+
+  h1 {
+    font-family: var(--serif);
+    font-size: clamp(2rem, 4vw, 2.75rem);
+    font-weight: 600;
+    line-height: 1.22;
+    color: var(--ink);
+    margin-bottom: 1.25rem;
+    letter-spacing: -0.01em;
+  }
+
+  .subtitle {
+    font-family: var(--sans);
+    font-size: 1.1rem;
+    font-weight: 300;
+    color: var(--ink-muted);
+    line-height: 1.65;
+    margin-bottom: 2rem;
+    max-width: 620px;
+  }
+
+  .byline {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    font-family: var(--sans);
+    font-size: 13px;
+    color: var(--ink-muted);
+    border-top: 1px solid var(--paper-rule);
+    padding-top: 1.25rem;
+  }
+
+  .byline-avatar {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #c0392b, #e74c3c);
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--sans);
+    font-size: 12px;
+    font-weight: 600;
+    color: #fff;
+    flex-shrink: 0;
+  }
+
+  .byline-sep { color: var(--paper-rule); }
+
+  .hero-image {
+    width: 100%;
+    height: 280px;
+    background: var(--ink);
+    position: relative;
+    overflow: hidden;
+    margin: 0;
+  }
+
+  .hero-image-inner {
+    width: 100%;
+    height: 100%;
+    background:
+      repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 28px,
+        rgba(255,255,255,0.04) 28px,
+        rgba(255,255,255,0.04) 29px
+      ),
+      repeating-linear-gradient(
+        90deg,
+        transparent,
+        transparent 28px,
+        rgba(255,255,255,0.04) 28px,
+        rgba(255,255,255,0.04) 29px
+      );
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  .hero-diagram {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: rgba(255,255,255,0.85);
+  }
+
+  .hero-node {
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.18);
+    border-radius: 6px;
+    padding: 8px 14px;
+    white-space: nowrap;
+    text-align: center;
+  }
+
+  .hero-node.accent {
+    background: rgba(192,57,43,0.4);
+    border-color: rgba(192,57,43,0.7);
+    color: #fff;
+  }
+
+  .hero-arrow {
+    font-size: 14px;
+    color: rgba(255,255,255,0.3);
+    padding: 0 6px;
+  }
+
+  .hero-label {
+    font-family: var(--sans);
+    font-size: 12px;
+    color: rgba(255,255,255,0.35);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  article {
+    max-width: var(--max-w);
+    margin: 0 auto;
+    padding: 0 2rem 6rem;
+  }
+
+  p {
+    margin-bottom: 1.4rem;
+    color: var(--ink);
+  }
+
+  h2 {
+    font-family: var(--serif);
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--ink);
+    margin: 3rem 0 1rem;
+    line-height: 1.3;
+  }
+
+  h3 {
+    font-family: var(--sans);
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--ink);
+    margin: 2rem 0 0.6rem;
+    letter-spacing: 0.01em;
+  }
+
+  strong {
+    font-weight: 600;
+    color: var(--ink);
+  }
+
+  a {
+    color: var(--link);
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+  }
+
+  .lead {
+    font-size: 1.15rem;
+    color: var(--ink-muted);
+    font-style: italic;
+    border-left: 3px solid var(--accent);
+    padding-left: 1.25rem;
+    margin: 2rem 0 2.5rem;
+    line-height: 1.75;
+  }
+
+  .section-rule {
+    border: none;
+    border-top: 1px solid var(--paper-rule);
+    margin: 3rem 0;
+  }
+
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--code-border);
+    border-radius: 6px;
+    padding: 1.25rem 1.5rem;
+    overflow-x: auto;
+    margin: 1.75rem 0;
+    font-family: var(--mono);
+    font-size: 13.5px;
+    line-height: 1.65;
+    color: var(--ink);
+  }
+
+  code {
+    font-family: var(--mono);
+    font-size: 0.84em;
+    background: var(--code-bg);
+    border: 1px solid var(--code-border);
+    border-radius: 3px;
+    padding: 1px 5px;
+    color: var(--ink);
+  }
+
+  pre code {
+    background: none;
+    border: none;
+    padding: 0;
+    font-size: inherit;
+  }
+
+  .code-label {
+    font-family: var(--sans);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin-bottom: 0.4rem;
+  }
+
+  .result-block {
+    background: var(--paper-warm);
+    border: 1px solid var(--paper-rule);
+    border-left: 3px solid var(--accent);
+    border-radius: 0 6px 6px 0;
+    padding: 1.25rem 1.5rem;
+    margin: 1.75rem 0;
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 1.7;
+    color: var(--ink);
+  }
+
+  .benchmark-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: var(--sans);
+    font-size: 14px;
+    margin: 1.75rem 0;
+  }
+
+  .benchmark-table th {
+    background: var(--paper-warm);
+    color: var(--ink-muted);
+    font-weight: 600;
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0.6rem 1rem;
+    text-align: left;
+    border-bottom: 1px solid var(--paper-rule);
+  }
+
+  .benchmark-table td {
+    padding: 0.6rem 1rem;
+    border-bottom: 1px solid var(--paper-rule);
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .benchmark-table tr:last-child td { border-bottom: none; }
+
+  .benchmark-table td.num {
+    text-align: right;
+    font-family: var(--mono);
+    font-size: 13px;
+  }
+
+  .benchmark-table td.highlight {
+    color: var(--accent);
+    font-weight: 600;
+  }
+
+  .benchmark-table caption {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .callout {
+    background: var(--accent-soft);
+    border: 1px solid #f5c6c0;
+    border-radius: 6px;
+    padding: 1.25rem 1.5rem;
+    margin: 2rem 0;
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.65;
+    color: var(--ink);
+  }
+
+  .callout-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 0.5rem;
+  }
+
+  .arch-diagram {
+    background: var(--paper-warm);
+    border: 1px solid var(--paper-rule);
+    border-radius: 6px;
+    padding: 1.5rem;
+    margin: 1.75rem 0;
+    font-family: var(--mono);
+    font-size: 12.5px;
+    line-height: 1.9;
+    color: var(--ink);
+    overflow-x: auto;
+  }
+
+  .phase-badge {
+    display: inline-block;
+    background: var(--ink);
+    color: var(--paper);
+    font-family: var(--sans);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    border-radius: 3px;
+    margin-right: 0.5rem;
+    vertical-align: middle;
+    position: relative;
+    top: -1px;
+  }
+
+  .tradeoff-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin: 1.75rem 0;
+  }
+
+  .tradeoff-card {
+    background: var(--paper-warm);
+    border: 1px solid var(--paper-rule);
+    border-radius: 6px;
+    padding: 1rem 1.25rem;
+  }
+
+  .tradeoff-card h4 {
+    font-family: var(--sans);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink);
+    margin-bottom: 0.4rem;
+  }
+
+  .tradeoff-card p {
+    font-family: var(--sans);
+    font-size: 13px;
+    color: var(--ink-muted);
+    line-height: 1.55;
+    margin: 0;
+  }
+
+  @media (max-width: 560px) {
+    .tradeoff-grid { grid-template-columns: 1fr; }
+    .hero-diagram { flex-wrap: wrap; justify-content: center; }
+    .benchmark-table {
+      display: block;
+      overflow-x: auto;
+      white-space: nowrap;
+    }
+    h1 { font-size: 1.7rem; }
+  }
+
+  .comment { color: #7a756e; }
+  .kw { color: #905d2d; }
+  .str { color: #3a7a4a; }
+  .num { color: #3a5a9a; }
+</style>
+</head>
+<body>
+
+<header class="masthead">
+  <span>Engineering</span>
+  <span class="masthead-dot" aria-hidden="true"></span>
+  <span>Concurrency</span>
+  <span class="masthead-dot" aria-hidden="true"></span>
+  <span>Java</span>
+</header>
+
+<main>
+
+<div class="hero-image" aria-label="Concurrency phase performance summary">
+  <div class="hero-image-inner">
+    <div class="hero-diagram">
+      <div class="hero-node">Sequential<br>5,588 ms</div>
+      <span class="hero-arrow">→</span>
+      <div class="hero-node accent">Thread Pool<br>194 ms</div>
+      <span class="hero-arrow">→</span>
+      <div class="hero-node">Pipeline<br>929 ms</div>
+      <span class="hero-arrow">→</span>
+      <div class="hero-node">Virtual Threads<br>p99 &lt; 2 ms</div>
+    </div>
+    <div class="hero-label">28× speedup · measured, not estimated</div>
+  </div>
+</div>
+
+<div class="hero">
+  <div class="category-tag">Java · Concurrency · Systems</div>
+  <h1>Java Concurrency in Practice: From Blocking I/O to Virtual Threads</h1>
+  <p class="subtitle">A hands-on walk through every concurrency primitive in the Java ecosystem — sequential baselines, thread pools, bounded queues, lock-free data structures, and virtual threads — built around a real, runnable news aggregator.</p>
+  <div class="byline">
+    <div class="byline-avatar">NR</div>
+    <div>
+      <strong>NewsRadar Concurrency Handbook</strong>
+      <span class="byline-sep"> · </span>
+      <span>7-Phase Build · Java 21+ · Maven</span>
+    </div>
+  </div>
+</div>
+
+<article>
+
+  <p class="lead">In concurrent Java systems, the difference between blocking one thread and blocking ten thousand is the difference between a slow API and a non-functional one. But understanding <em>why</em> — and how to fix it — requires working through each primitive one at a time, with real measurements at every step.</p>
+
+  <p>This is the story of NewsRadar: a concurrent RSS news aggregator built from scratch across seven phases. Each phase introduces exactly one new concurrency concept, applies it to a real problem, and produces a measurable result you can see in your terminal.</p>
+
+  <p>By the end, we go from a single-threaded blocker that takes nearly 6 seconds to fetch 20 RSS feeds, to a virtual-thread HTTP search API that handles 2,000 concurrent clients at under 2 ms p99.</p>
+
+  <hr class="section-rule">
+
+  <h2>The Problem With Blocking I/O</h2>
+
+  <p>In the early days of any service, a sequential fetch loop is sufficient. You read one URL, wait for the response, parse it, move to the next. Simple, correct, easy to debug.</p>
+
+  <p>As the service grows, this becomes untenable. A sequential RSS aggregator fetching 20 feeds performs 20 blocking socket reads in series:</p>
+
+  <div class="code-label">Sequential Behavior</div>
+  <pre>URL  1: Fetch (725 ms) → Parse (14 ms)
+URL  2: Fetch (420 ms) → Parse ( 9 ms)
+URL  3: Fetch (408 ms) → Parse (12 ms)
+...
+URL 20: Fetch (261 ms) → Parse ( 4 ms)
+─────────────────────────────────────
+Wall time: 5,890 ms   Sum of fetches: 5,871 ms</pre>
+
+  <p>Notice the critical detail: wall time equals the <em>sum</em> of all fetch latencies. The CPU was <strong>idle for 99.7% of the run</strong>, parked on socket reads, waiting for remote servers to respond.</p>
+
+  <p>This is the fundamental shape of a blocking I/O bottleneck. It is not a code quality problem. It is a structural one. And it is exactly the problem that concurrency is designed to solve.</p>
+
+  <hr class="section-rule">
+
+  <h2>Phase 2 — Thread Pool Fetcher: The Classic Win</h2>
+
+  <p>The fix is straightforward: submit each feed as a <code>Callable&lt;List&lt;Article&gt;&gt;</code> to a fixed-size <code>ExecutorService</code>. Instead of blocking one thread on each fetch sequentially, the pool runs multiple fetches in parallel.</p>
+
+  <div class="code-label">PooledAggregator.java</div>
+  <pre><span class="kw">ExecutorService</span> exec = Executors.newFixedThreadPool(poolSize, namedThreadFactory(<span class="str">"fetcher"</span>));
+List&lt;Future&lt;TaskResult&gt;&gt; futures = <span class="kw">new</span> ArrayList&lt;&gt;();
+
+<span class="kw">for</span> (FeedConfig feed : feeds) {
+    futures.add(exec.submit(() -&gt; {
+        <span class="kw">try</span> {
+            RawFeed raw = fetcher.fetch(feed);          <span class="comment">// blocks this thread</span>
+            List&lt;Article&gt; articles = parser.parse(raw);
+            <span class="kw">return</span> TaskResult.ok(Thread.currentThread().getName(), articles, ...);
+        } <span class="kw">catch</span> (Exception e) {
+            <span class="kw">return</span> TaskResult.fail(Thread.currentThread().getName(), ...);
+        }
+    }));
+}
+
+<span class="comment">// collect results with per-task timeout</span>
+<span class="kw">for</span> (Future&lt;TaskResult&gt; f : futures) {
+    TaskResult result = f.get(perTaskTimeout.toMillis(), TimeUnit.MILLISECONDS);
+    ...
+}
+
+<span class="comment">// graceful shutdown: drain → wait → force</span>
+exec.shutdown();
+exec.awaitTermination(<span class="num">30</span>, TimeUnit.SECONDS);
+exec.shutdownNow();</pre>
+
+  <p>The results are dramatic. Running the same 20 feeds through pools of varying sizes:</p>
+
+  <table class="benchmark-table">
+    <caption>Thread pool fetcher performance by pool size</caption>
+    <thead>
+      <tr>
+        <th>Strategy</th>
+        <th>Pool Size</th>
+        <th class="num">Wall Time</th>
+        <th class="num">Articles</th>
+        <th class="num">Speedup</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Sequential</td>
+        <td>1</td>
+        <td class="num">5,588 ms</td>
+        <td class="num">509</td>
+        <td class="num">1.00×</td>
+      </tr>
+      <tr>
+        <td>Pooled</td>
+        <td>4</td>
+        <td class="num">492 ms</td>
+        <td class="num">509</td>
+        <td class="num">11.36×</td>
+      </tr>
+      <tr>
+        <td>Pooled</td>
+        <td>8</td>
+        <td class="num">291 ms</td>
+        <td class="num">509</td>
+        <td class="num">19.20×</td>
+      </tr>
+      <tr>
+        <td>Pooled</td>
+        <td>16</td>
+        <td class="num highlight">194 ms</td>
+        <td class="num">509</td>
+        <td class="num highlight">28.80×</td>
+      </tr>
+      <tr>
+        <td>Pooled</td>
+        <td>32</td>
+        <td class="num">214 ms</td>
+        <td class="num">509</td>
+        <td class="num">26.11×</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="callout">
+    <div class="callout-label">Key Insight</div>
+    Pool=32 is <em>slower</em> than pool=16. Once you have more threads than meaningful concurrent workloads, thread-creation overhead and scheduling noise win. For I/O-bound work, the optimal pool size is roughly: <code>min(task count, ~24)</code> — not "more cores = more speed."
+  </div>
+
+  <p>There are two speedup numbers worth tracking separately. The headline "28.8×" is the effective wall-time speedup. But the <em>real parallelism</em> number — sum of all fetch latencies divided by wall time — tops out around 6.7× at pool=16. The rest of the gain comes from JVM warm-up: by the time pool=16 runs, DNS is cached, TLS sessions are resumed, and the JIT is warm. This is a real benefit of moving to pooled fetching, but it is not concurrency doing the work.</p>
+
+  <hr class="section-rule">
+
+  <h2>Phase 3 — Bounded-Queue Pipeline: Decoupling Stages</h2>
+
+  <p>The thread pool improvement has a structural problem: fetch and parse run on the same thread. A slow parse blocks that thread from picking up the next fetch. More importantly, all 20 <code>Callable</code>s sit in the queue simultaneously — fine for 20 feeds, catastrophic for 20,000.</p>
+
+  <p>The solution is a producer-consumer pipeline with bounded <code>ArrayBlockingQueue</code>s between independent stages.</p>
+
+  <div class="arch-diagram">
+feeds (20)
+    │
+    ▼
+┌─────────────────────────────┐
+│  fetcher pool  (16 threads) │  ← I/O-bound, large pool
+└──────────────┬──────────────┘
+               │  rawQueue.put(raw)   ← BLOCKS if queue full
+               ▼
+      ┌────────────────┐
+      │ rawQueue (cap 8)│  ArrayBlockingQueue&lt;RawFeed&gt;
+      └───────┬─────────┘
+               │  rawQueue.take()
+               ▼
+┌─────────────────────────────┐
+│  parser pool   (4 threads)  │  ← CPU-bound, ≈ cores
+└──────────────┬──────────────┘
+               │  articleQueue.put(article)
+               ▼
+      ┌─────────────────────┐
+      │ articleQueue (cap 64)│  ArrayBlockingQueue&lt;Article&gt;
+      └───────┬──────────────┘
+               │  articleQueue.take()
+               ▼
+┌─────────────────────────────┐
+│  indexer  (1 thread)        │
+└─────────────────────────────┘</div>
+
+  <p>Three executors, two queues, four control points. The bounded queue is the load-bearing primitive: when the parser pool is saturated, <code>rawQueue.put()</code> parks the calling fetcher thread. Backpressure propagates naturally through the pipeline without any explicit coordination code.</p>
+
+  <h3>Poison Pills for Clean Shutdown</h3>
+
+  <p>Stopping producer-consumer pipelines cleanly is notoriously tricky. The right pattern is the poison pill — a sentinel value that signals end-of-stream:</p>
+
+  <div class="code-label">RawFeed.java</div>
+  <pre><span class="kw">public record</span> RawFeed(String feedId, <span class="kw">byte</span>[] body, String contentType) {
+    <span class="comment">// Reference equality (==) — not .equals(). Records auto-generate
+    // equals() from values, but a sentinel must be unique by identity.</span>
+    <span class="kw">public static final</span> RawFeed SHUTDOWN = 
+        <span class="kw">new</span> RawFeed(<span class="str">"__SHUTDOWN__"</span>, <span class="kw">new byte</span>[<span class="num">0</span>], <span class="str">"__SHUTDOWN__"</span>);
+
+    <span class="kw">public boolean</span> isShutdown() { <span class="kw">return this</span> == SHUTDOWN; }
+}</pre>
+
+  <p>The shutdown sequence: wait for all fetcher futures → put N pills (one per parser thread) → wait for all parser futures → put one pill for the indexer. Each consumer takes exactly one pill and exits voluntarily. No <code>shutdownNow()</code> needed, no interrupted threads mid-write, no lost articles.</p>
+
+  <div class="callout">
+    <div class="callout-label">Backpressure Caught Live</div>
+    Tightening the pipeline to <code>--parsers=1 --queue=1</code> produced 12 fetcher stalls in a real run — fetcher threads parked on <code>rawQueue.put()</code> because the single parser couldn't keep up. The bounded queue isn't decorative; it is a runtime guarantee that memory cannot grow without bound.
+  </div>
+
+  <hr class="section-rule">
+
+  <h2>Phase 4 — Thread-Safe Inverted Index: Getting Shared State Right</h2>
+
+  <p>The search index at the core of NewsRadar is a <code>Map&lt;String, Set&lt;ArticleId&gt;&gt;</code> — tokens mapped to the article IDs that contain them. Under concurrent writes from a 16-thread pipeline, three implementations produce very different outcomes.</p>
+
+  <h3>Implementation 1: UnsafeHashMapIndex (broken)</h3>
+
+  <div class="code-label">UnsafeHashMapIndex.java — the race condition</div>
+  <pre><span class="comment">// The classic check-then-act race:</span>
+Set&lt;String&gt; set = postings.get(token);
+<span class="kw">if</span> (set == <span class="kw">null</span>) {
+    set = <span class="kw">new</span> HashSet&lt;&gt;();
+    postings.put(token, set);  <span class="comment">// Thread B can overwrite A's put here</span>
+}
+set.add(article.id());         <span class="comment">// HashSet itself is not thread-safe</span></pre>
+
+  <p>Two threads can both observe <code>null</code>, both create a new <code>HashSet</code>, and one will overwrite the other's entry. Everything added to the first set is silently lost. At high contention, concurrent <code>HashMap</code> resizes can corrupt bucket linked-lists, causing the iterator to visit entries twice — the stress test observed <strong>106 distinct tokens reported when only 100 existed</strong> in the vocabulary.</p>
+
+  <h3>Implementation 2: SynchronizedIndex (correct, slow)</h3>
+
+  <pre><span class="kw">public synchronized void</span> index(Article article) { ... }
+<span class="kw">public synchronized</span> Set&lt;String&gt; articleIdsFor(String token) { ... }</pre>
+
+  <p>Every operation acquires the same intrinsic lock. Correct. But with 16 threads, 15 of them are always parked on the monitor. Throughput is bounded by a single serialization point regardless of how many cores you have.</p>
+
+  <h3>Implementation 3: ConcurrentIndex (correct and scales)</h3>
+
+  <div class="code-label">ConcurrentIndex.java</div>
+  <pre>postings.computeIfAbsent(token, k -&gt; ConcurrentHashMap.newKeySet())
+        .add(article.id());</pre>
+
+  <p>Three carefully chosen primitives:</p>
+  <p><strong><code>ConcurrentHashMap</code></strong> — each internal bin has its own lock. Writers to different tokens never contend at all.</p>
+  <p><strong><code>computeIfAbsent</code></strong> — atomic check-and-create. The get/put race that breaks the unsafe version cannot happen: at most one <code>Set</code> is ever created per token.</p>
+  <p><strong><code>ConcurrentHashMap.newKeySet()</code></strong> — a thread-safe <code>Set</code> backed by CHM's own fine-grained locking. Concurrent <code>add</code> calls on the same key set use the same bucket-level locking as the outer map.</p>
+
+  <p>Stress test results — 16 threads × 50,000 articles × 20 tokens, 100-token vocabulary:</p>
+
+  <table class="benchmark-table">
+    <caption>Thread-safe index implementation comparison</caption>
+    <thead>
+      <tr>
+        <th>Implementation</th>
+        <th>Correct?</th>
+        <th class="num">Tokens</th>
+        <th class="num">Postings</th>
+        <th class="num">Elapsed</th>
+        <th class="num">ops/sec</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>UnsafeHashMapIndex</td>
+        <td style="color:#c0392b;font-weight:600">NO</td>
+        <td class="num" style="color:#c0392b">106</td>
+        <td class="num" style="color:#c0392b">995,859</td>
+        <td class="num">82 ms</td>
+        <td class="num">12,144,621</td>
+      </tr>
+      <tr>
+        <td>SynchronizedIndex</td>
+        <td style="color:#27ae60;font-weight:600">yes</td>
+        <td class="num">100</td>
+        <td class="num">1,000,000</td>
+        <td class="num">430 ms</td>
+        <td class="num">2,325,581</td>
+      </tr>
+      <tr>
+        <td>ConcurrentIndex</td>
+        <td style="color:#27ae60;font-weight:600">yes</td>
+        <td class="num">100</td>
+        <td class="num">1,000,000</td>
+        <td class="num highlight">165 ms</td>
+        <td class="num highlight">6,060,606</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="callout">
+    <div class="callout-label">The Lesson</div>
+    The unsafe index's 12M ops/sec is meaningless — it is garbage-fast, producing results that cannot be trusted. The "correct?" column gates everything else. A broken data structure that runs faster is not better; it is just broken faster.
+  </div>
+
+  <hr class="section-rule">
+
+  <h2>Phase 5 — HTTP Search API on Virtual Threads</h2>
+
+  <p>The <code>SearchableIndex</code> wraps the concurrent index behind a <code>ReentrantReadWriteLock</code>. Individual reads and writes go directly to the CHM-backed internals (no lock needed there). The read-write lock only guards whole-index <em>swaps</em> — replacing both the index and the article map atomically when Phase 6's scheduled refresh fires.</p>
+
+  <div class="code-label">SearchableIndex.java — asymmetric locking</div>
+  <pre><span class="kw">public</span> List&lt;Article&gt; search(String query, <span class="kw">int</span> limit) {
+    lock.readLock().lock();             <span class="comment">// many readers can hold this simultaneously</span>
+    <span class="kw">try</span> {
+        InvertedIndex idx = <span class="kw">this</span>.index;   <span class="comment">// snapshot refs atomically</span>
+        Map&lt;String, Article&gt; arts = <span class="kw">this</span>.articles;
+        <span class="comment">// AND-semantics: intersect posting sets for each query token</span>
+        ...
+    } <span class="kw">finally</span> { lock.readLock().unlock(); }
+}
+
+<span class="kw">public void</span> swap(InvertedIndex newIndex, Map&lt;String, Article&gt; newArticles) {
+    lock.writeLock().lock();            <span class="comment">// rare; blocks all readers briefly</span>
+    <span class="kw">try</span> {
+        <span class="kw">this</span>.index = newIndex;
+        <span class="kw">this</span>.articles = newArticles;
+        <span class="kw">this</span>.lastRefresh = Instant.now();
+    } <span class="kw">finally</span> { lock.writeLock().unlock(); }
+}</pre>
+
+  <p>The HTTP server uses a single line to swap from a platform-thread pool to Java 21 virtual threads:</p>
+
+  <div class="code-label">SearchServer.java</div>
+  <pre>server = HttpServer.create(<span class="kw">new</span> InetSocketAddress(port), <span class="comment">/* backlog */</span> <span class="num">1024</span>);
+server.setExecutor(Executors.newVirtualThreadPerTaskExecutor());
+server.createContext(<span class="str">"/search"</span>, <span class="kw">new</span> SearchHandler(index, json));
+server.createContext(<span class="str">"/health"</span>, <span class="kw">new</span> HealthHandler(index, refresher, json));
+server.start();</pre>
+
+  <p>Each request gets its own virtual thread. The handler code is plain blocking Java — no callbacks, no reactive plumbing. The runtime makes blocking cheap by mounting virtual threads on a small pool of carrier threads and unmounting them when they park on I/O.</p>
+
+  <p>Load test results — varying client concurrency against the same server:</p>
+
+  <table class="benchmark-table">
+    <caption>Virtual-thread HTTP search API load test results</caption>
+    <thead>
+      <tr>
+        <th>Clients</th>
+        <th class="num">Wall Time</th>
+        <th class="num">Successful</th>
+        <th class="num">Throughput</th>
+        <th class="num">p50</th>
+        <th class="num">p99</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>500</td>
+        <td class="num">903 ms</td>
+        <td class="num">500</td>
+        <td class="num">554 req/s</td>
+        <td class="num">756 µs</td>
+        <td class="num">851 µs</td>
+      </tr>
+      <tr>
+        <td>1,000</td>
+        <td class="num">1,257 ms</td>
+        <td class="num">1,000</td>
+        <td class="num">796 req/s</td>
+        <td class="num">836 µs</td>
+        <td class="num">1,173 µs</td>
+      </tr>
+      <tr>
+        <td>2,000</td>
+        <td class="num highlight">2,026 ms</td>
+        <td class="num highlight">2,000</td>
+        <td class="num">987 req/s</td>
+        <td class="num">1,488 µs</td>
+        <td class="num highlight">1,966 µs</td>
+      </tr>
+      <tr>
+        <td>5,000</td>
+        <td class="num">3,144 ms</td>
+        <td class="num" style="color:#c0392b">3,173</td>
+        <td class="num">1,590 req/s</td>
+        <td class="num">2,080 µs</td>
+        <td class="num">2,768 µs</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p>At 2,000 simultaneous virtual threads, every request completes successfully in under 2 ms p99. The JVM held 2,000 virtual threads — each parked on its outbound socket — multiplexed over a small carrier pool. Try this with <code>Executors.newFixedThreadPool(2000)</code> and you would burn roughly 2 GB of stack memory before issuing the first request.</p>
+
+  <p>At 5,000 clients, 1,827 requests fail with <code>ConnectException</code>. The virtual threads were not the bottleneck — the <strong>OS kernel listen queue</strong> overflowed. The fix is persistent connections (HTTP/2) or capping in-flight requests via a <code>Semaphore</code>. The JVM needed no changes.</p>
+
+  <hr class="section-rule">
+
+  <h2>Phase 6 — Scheduled Refresh and Graceful Shutdown</h2>
+
+  <p>A real service re-indexes periodically. Phase 6 wires a <code>ScheduledExecutorService</code> that rebuilds the full index off-line every 30 seconds and swaps it in atomically:</p>
+
+  <div class="code-label">ScheduledRefresher.java</div>
+  <pre>handle = scheduler.scheduleAtFixedRate(
+    <span class="kw">this</span>::refresh, <span class="num">0</span>, interval.toMillis(), TimeUnit.MILLISECONDS);
+
+<span class="kw">private void</span> refresh() {
+    refreshing.set(<span class="kw">true</span>);
+    <span class="kw">try</span> {
+        <span class="comment">// Build a new index off-line — readers hit the current one uninterrupted</span>
+        InvertedIndex freshIndex = <span class="kw">new</span> ConcurrentIndex();
+        Map&lt;String, Article&gt; freshArticles = <span class="kw">new</span> ConcurrentHashMap&lt;&gt;();
+        <span class="kw">for</span> (Article a : pipeline.run(feeds).articles()) {
+            freshIndex.index(a);
+            freshArticles.put(a.id(), a);
+        }
+        target.swap(freshIndex, freshArticles);    <span class="comment">// atomic under write lock</span>
+    } <span class="kw">finally</span> {
+        refreshing.set(<span class="kw">false</span>);
+        firstRefreshLatch.countDown();             <span class="comment">// CountDownLatch: fire once, wake all waiters</span>
+    }
+}</pre>
+
+  <p>A <code>CountDownLatch(1)</code> gates server startup: the main thread blocks on <code>awaitFirstRefresh()</code> until the index is populated. The search endpoint never returns empty results during a cold start.</p>
+
+  <p>Shutdown runs in reverse dependency order — stop accepting requests, cancel the schedule, await any in-flight refresh, drain pools:</p>
+
+  <div class="code-label">Shutdown sequence</div>
+  <pre>server.stop();         <span class="comment">// 1. close socket, drain in-flight exchanges</span>
+refresher.stop();      <span class="comment">// 2. cancel schedule, awaitTermination(30s)</span>
+                       <span class="comment">// 3. each pool does shutdown() → awaitTermination → shutdownNow()</span></pre>
+
+  <hr class="section-rule">
+
+  <h2>Phase 7 — JMH Benchmarks: Measure, Not Guess</h2>
+
+  <p>The final phase is a suite of JMH microbenchmarks that isolate each architectural decision and measure it with rigorous methodology. The most important finding is also the most counterintuitive.</p>
+
+  <table class="benchmark-table">
+    <caption>JMH benchmark results across indexing and aggregation</caption>
+    <thead>
+      <tr>
+        <th>Benchmark</th>
+        <th>Mode</th>
+        <th class="num">Score</th>
+        <th>Units</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>IndexWriteBenchmark.concurrentWrite</td>
+        <td>thrpt</td>
+        <td class="num highlight">1,512,033</td>
+        <td>ops/s</td>
+      </tr>
+      <tr>
+        <td>IndexWriteBenchmark.synchronizedWrite</td>
+        <td>thrpt</td>
+        <td class="num">251,447</td>
+        <td>ops/s</td>
+      </tr>
+      <tr>
+        <td>SearchableIndexBenchmark.readOnly</td>
+        <td>thrpt</td>
+        <td class="num">1,309,850</td>
+        <td>ops/s</td>
+      </tr>
+      <tr>
+        <td>AggregatorBenchmark.sequential</td>
+        <td>avgt</td>
+        <td class="num">1.503</td>
+        <td>ms/op</td>
+      </tr>
+      <tr>
+        <td>AggregatorBenchmark.pooled</td>
+        <td>avgt</td>
+        <td class="num">1.274</td>
+        <td>ms/op</td>
+      </tr>
+      <tr>
+        <td>AggregatorBenchmark.pipeline</td>
+        <td>avgt</td>
+        <td class="num" style="color:#c0392b">1.792</td>
+        <td>ms/op</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="callout">
+    <div class="callout-label">The Critical Lesson</div>
+    In the JMH benchmark, the pipeline is <em>slower</em> than sequential. The stub fetcher returns bytes instantly — zero network latency. Without I/O wait, the bounded-queue overhead (two <code>ArrayBlockingQueue</code> put/take round-trips per item, poison-pill coordination, multiple pool shutdowns) adds cost with no benefit. The real-world 28× speedup came entirely from overlapping <em>network waits</em> — not from CPUs running faster.
+  </div>
+
+  <p>This is why benchmarks matter. "Thread pools and pipelines are fast" is the wrong mental model. The correct mental model is: <strong>thread pools and pipelines eliminate wasted wait time</strong>. If there is no wait time to eliminate, they add overhead.</p>
+
+  <hr class="section-rule">
+
+  <h2>Architecture: The Final Shape</h2>
+
+  <div class="arch-diagram">
+                  ┌───────────────────────────────────────────┐
+                  │              NewsRadar JVM                │
+                  │                                           │
+   feeds.yaml ──▶ │  Scheduler  ─every 30s─▶  Fetcher Pool   │
+                  │                          (HTTP, I/O)      │
+                  │                                │          │
+                  │                                ▼          │
+                  │                    BlockingQueue&lt;RawFeed&gt; │
+                  │                                │          │
+                  │                                ▼          │
+                  │                          Parser Pool      │
+                  │                          (CPU-bound)      │
+                  │                                │          │
+                  │                                ▼          │
+                  │                     SearchableIndex       │
+                  │                   (ConcHashMap +          │
+                  │                    ReadWriteLock)         │
+                  │                                ▲          │
+   GET /search ───┼──▶  HTTP Server (virtual threads) ────────┤
+                  └───────────────────────────────────────────┘</div>
+
+  <hr class="section-rule">
+
+  <h2>Tradeoffs and Design Considerations</h2>
+
+  <p>While each primitive is powerful in its domain, the choices are not free:</p>
+
+  <div class="tradeoff-grid">
+    <div class="tradeoff-card">
+      <h4>Pool sizing for I/O</h4>
+      <p>I/O-bound pools are not sized by core count — they are sized by meaningful concurrent in-flight requests. Beyond the task count, extra threads add scheduling noise with no throughput gain.</p>
+    </div>
+    <div class="tradeoff-card">
+      <h4>Bounded vs. unbounded queues</h4>
+      <p>An unbounded <code>LinkedBlockingQueue</code> with no capacity limit will grow until the heap exhausts. Always use <code>ArrayBlockingQueue</code> with an explicit capacity for production pipelines.</p>
+    </div>
+    <div class="tradeoff-card">
+      <h4>ReadWriteLock vs. synchronized</h4>
+      <p><code>ReadWriteLock</code> only pays off when reads vastly outnumber writes. For a search API with one refresh per 30 seconds and thousands of searches, it is the correct choice. For a write-heavy store, the cost of acquiring the write lock is high.</p>
+    </div>
+    <div class="tradeoff-card">
+      <h4>Virtual threads vs. platform threads</h4>
+      <p>Virtual threads are not faster at CPU work — they are cheaper at blocking. If your workload is CPU-bound, a <code>ForkJoinPool</code> sized to core count outperforms a virtual-thread executor.</p>
+    </div>
+  </div>
+
+  <hr class="section-rule">
+
+  <h2>Conclusion</h2>
+
+  <p>Concurrency in Java is not a single tool — it is a toolkit matched to workload shape. The same 20-feed aggregator went from 5,588 ms (sequential) to 194 ms (thread pool) not because of faster hardware, but because the workload was almost entirely I/O wait that could be parallelized.</p>
+
+  <p>Each phase of this build tells a concrete story: sequential proves the problem. Thread pools show the win. Bounded queues prove the safety guarantee. Three index implementations prove what correctness costs. Virtual threads prove that blocking I/O is no longer a resource constraint in Java 21+. And JMH proves that every one of these claims needs a measurement — because intuition about concurrent performance is reliably wrong.</p>
+
+  <p>Whether you are building a news aggregator, a machine learning ingestion pipeline, or a high-throughput API, these are the same patterns and the same tradeoffs. The correct starting point is always the same: measure the baseline, identify where the time is spent, and pick the primitive that addresses that specific cost.</p>
+
+  <div class="callout" style="margin-top: 3rem;">
+    <div class="callout-label">Run It Yourself</div>
+    The full 7-phase codebase, phase write-ups, and JMH benchmark results are available in the <a href="../README.md">Java Concurrency Handbook repository</a>. Every number in this post is reproducible with <code>mvn exec:java -Dexec.args="--mode=compare"</code>.
+  </div>
+
+</article>
+
+</main>
+
+</body>
+</html>
