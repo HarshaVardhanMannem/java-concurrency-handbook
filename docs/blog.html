@@ -725,33 +725,44 @@ exec.shutdownNow();</pre>
 
   <p>The solution is a producer-consumer pipeline with bounded <code>ArrayBlockingQueue</code>s between independent stages.</p>
 
-  <div class="arch-diagram">
-feeds (20)
-    │
-    ▼
-┌─────────────────────────────┐
-│  fetcher pool  (16 threads) │  ← I/O-bound, large pool
-└──────────────┬──────────────┘
-               │  rawQueue.put(raw)   ← BLOCKS if queue full
-               ▼
-      ┌────────────────┐
-      │ rawQueue (cap 8)│  ArrayBlockingQueue&lt;RawFeed&gt;
-      └───────┬─────────┘
-               │  rawQueue.take()
-               ▼
-┌─────────────────────────────┐
-│  parser pool   (4 threads)  │  ← CPU-bound, ≈ cores
-└──────────────┬──────────────┘
-               │  articleQueue.put(article)
-               ▼
-      ┌─────────────────────┐
-      │ articleQueue (cap 64)│  ArrayBlockingQueue&lt;Article&gt;
-      └───────┬──────────────┘
-               │  articleQueue.take()
-               ▼
-┌─────────────────────────────┐
-│  indexer  (1 thread)        │
-└─────────────────────────────┘</div>
+  <div class="system-diagram" role="img" aria-label="Bounded queue pipeline showing feeds, fetcher pool, raw feed queue, parser pool, article queue, and indexer">
+    <div class="system-diagram-title">Bounded-Queue Pipeline</div>
+    <div class="jvm-box">
+      <div class="diagram-flow">
+        <div class="diagram-node">
+          <strong>Feeds</strong>
+          <span>20 RSS sources</span>
+        </div>
+        <div class="diagram-arrow" aria-hidden="true">&darr;</div>
+        <div class="diagram-node accent">
+          <strong>Fetcher Pool</strong>
+          <span>16 threads, I/O-bound</span>
+        </div>
+        <div class="diagram-note">rawQueue.put(raw) blocks when the queue is full</div>
+        <div class="diagram-arrow" aria-hidden="true">&darr;</div>
+        <div class="diagram-node">
+          <strong>rawQueue</strong>
+          <span>ArrayBlockingQueue&lt;RawFeed&gt;, capacity 8</span>
+        </div>
+        <div class="diagram-arrow" aria-hidden="true">&darr;</div>
+        <div class="diagram-node accent">
+          <strong>Parser Pool</strong>
+          <span>4 threads, CPU-bound</span>
+        </div>
+        <div class="diagram-note">articleQueue.put(article) applies downstream backpressure</div>
+        <div class="diagram-arrow" aria-hidden="true">&darr;</div>
+        <div class="diagram-node">
+          <strong>articleQueue</strong>
+          <span>ArrayBlockingQueue&lt;Article&gt;, capacity 64</span>
+        </div>
+        <div class="diagram-arrow" aria-hidden="true">&darr;</div>
+        <div class="diagram-node accent">
+          <strong>Indexer</strong>
+          <span>single writer updates the search index</span>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <p>Three executors, two queues, four control points. The bounded queue is the load-bearing primitive: when the parser pool is saturated, <code>rawQueue.put()</code> parks the calling fetcher thread. Backpressure propagates naturally through the pipeline without any explicit coordination code.</p>
 
