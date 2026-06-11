@@ -32,7 +32,8 @@ java-concurrency-handbook/
 ├── ConcurrencyFlow.java        ← sequential vs threads vs pool benchmark
 │
 ├── docs/
-│   └── CONCEPTS.md             ← reference guide: threads, pools, locks, async
+│   ├── CONCEPTS.md             ← reference guide: threads, pools, locks, async
+│   └── blog.html               ← polished long-form article version
 │
 └── newsradar/                  ← 7-phase capstone project (Maven)
     ├── PHASES.md               ← full phase-by-phase learning roadmap
@@ -112,6 +113,8 @@ The [`docs/CONCEPTS.md`](docs/CONCEPTS.md) file is a standalone reference coveri
 - **`ExecutorService` → `CompletableFuture` → Virtual Threads** — when to use each
 - **Synchronization primitives** — `synchronized`, `ReentrantLock`, atomics, concurrent collections
 - **Quick decision tree** — I/O-bound vs CPU-bound vs mixed workloads
+
+Prefer a narrative article format? Open [`docs/blog.html`](docs/blog.html) in your browser.
 
 ---
 
