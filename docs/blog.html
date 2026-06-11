@@ -383,6 +383,112 @@
     overflow-x: auto;
   }
 
+  .system-diagram {
+    background: var(--paper-warm);
+    border: 1px solid var(--paper-rule);
+    border-radius: 6px;
+    padding: 1.5rem;
+    margin: 1.75rem 0;
+    font-family: var(--sans);
+  }
+
+  .system-diagram-title {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink-muted);
+    margin-bottom: 1rem;
+  }
+
+  .system-diagram-grid {
+    display: grid;
+    grid-template-columns: minmax(120px, 0.8fr) minmax(260px, 1.7fr) minmax(130px, 0.9fr);
+    gap: 1rem;
+    align-items: stretch;
+  }
+
+  .system-column,
+  .jvm-box {
+    min-width: 0;
+  }
+
+  .system-column {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0.75rem;
+  }
+
+  .jvm-box {
+    border: 1px solid var(--code-border);
+    border-radius: 6px;
+    background: var(--paper);
+    padding: 1rem;
+  }
+
+  .jvm-label {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--ink-faint);
+    text-align: center;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 0.9rem;
+  }
+
+  .diagram-node {
+    border: 1px solid var(--code-border);
+    border-radius: 6px;
+    background: #fff;
+    padding: 0.75rem 0.85rem;
+    text-align: center;
+    box-shadow: 0 1px 0 rgba(26,24,21,0.03);
+  }
+
+  .diagram-node strong {
+    display: block;
+    font-family: var(--sans);
+    font-size: 13px;
+    line-height: 1.25;
+  }
+
+  .diagram-node span {
+    display: block;
+    margin-top: 0.25rem;
+    font-size: 11px;
+    color: var(--ink-muted);
+    line-height: 1.35;
+  }
+
+  .diagram-node.accent {
+    border-color: #e7afa8;
+    background: var(--accent-soft);
+  }
+
+  .diagram-flow {
+    display: grid;
+    gap: 0.55rem;
+  }
+
+  .diagram-arrow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 18px;
+    color: var(--accent);
+    font-family: var(--mono);
+    font-size: 18px;
+    line-height: 1;
+  }
+
+  .diagram-note {
+    font-size: 11px;
+    color: var(--ink-muted);
+    text-align: center;
+    line-height: 1.4;
+  }
+
   .phase-badge {
     display: inline-block;
     background: var(--ink);
@@ -433,6 +539,8 @@
   @media (max-width: 560px) {
     .tradeoff-grid { grid-template-columns: 1fr; }
     .hero-diagram { flex-wrap: wrap; justify-content: center; }
+    .system-diagram-grid { grid-template-columns: 1fr; }
+    .system-column { justify-content: flex-start; }
     .benchmark-table {
       display: block;
       overflow-x: auto;
@@ -946,27 +1054,59 @@ refresher.stop();      <span class="comment">// 2. cancel schedule, awaitTermina
 
   <h2>Architecture: The Final Shape</h2>
 
-  <div class="arch-diagram">
-                  ┌───────────────────────────────────────────┐
-                  │              NewsRadar JVM                │
-                  │                                           │
-   feeds.yaml ──▶ │  Scheduler  ─every 30s─▶  Fetcher Pool   │
-                  │                          (HTTP, I/O)      │
-                  │                                │          │
-                  │                                ▼          │
-                  │                    BlockingQueue&lt;RawFeed&gt; │
-                  │                                │          │
-                  │                                ▼          │
-                  │                          Parser Pool      │
-                  │                          (CPU-bound)      │
-                  │                                │          │
-                  │                                ▼          │
-                  │                     SearchableIndex       │
-                  │                   (ConcHashMap +          │
-                  │                    ReadWriteLock)         │
-                  │                                ▲          │
-   GET /search ───┼──▶  HTTP Server (virtual threads) ────────┤
-                  └───────────────────────────────────────────┘</div>
+  <div class="system-diagram" role="img" aria-label="NewsRadar architecture showing feeds flowing through scheduler, fetcher pool, queue, parser pool, index, and HTTP search server">
+    <div class="system-diagram-title">NewsRadar JVM</div>
+    <div class="system-diagram-grid">
+      <div class="system-column">
+        <div class="diagram-node">
+          <strong>feeds.yaml</strong>
+          <span>RSS source config</span>
+        </div>
+        <div class="diagram-node">
+          <strong>GET /search</strong>
+          <span>client query</span>
+        </div>
+      </div>
+
+      <div class="jvm-box">
+        <div class="jvm-label">refresh and indexing path</div>
+        <div class="diagram-flow">
+          <div class="diagram-node">
+            <strong>Scheduler</strong>
+            <span>runs every 30 seconds</span>
+          </div>
+          <div class="diagram-arrow" aria-hidden="true">↓</div>
+          <div class="diagram-node accent">
+            <strong>Fetcher Pool</strong>
+            <span>HTTP, I/O-bound work</span>
+          </div>
+          <div class="diagram-arrow" aria-hidden="true">↓</div>
+          <div class="diagram-node">
+            <strong>BlockingQueue&lt;RawFeed&gt;</strong>
+            <span>bounded backpressure</span>
+          </div>
+          <div class="diagram-arrow" aria-hidden="true">↓</div>
+          <div class="diagram-node">
+            <strong>Parser Pool</strong>
+            <span>CPU-bound parsing</span>
+          </div>
+          <div class="diagram-arrow" aria-hidden="true">↓</div>
+          <div class="diagram-node accent">
+            <strong>SearchableIndex</strong>
+            <span>ConcurrentHashMap + ReadWriteLock</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="system-column">
+        <div class="diagram-node accent">
+          <strong>HTTP Server</strong>
+          <span>virtual thread per request</span>
+        </div>
+        <div class="diagram-note">Search requests read the latest indexed snapshot.</div>
+      </div>
+    </div>
+  </div>
 
   <hr class="section-rule">
 
